@@ -123,6 +123,7 @@ returns a prewritten answer. See [`fixtures/README.md`](fixtures/README.md).
 
 ## Documentation
 
+- [`PROJECT.md`](PROJECT.md) — що це за проєкт і навіщо (українською, почни звідси)
 - [`docs/01-plan.md`](docs/01-plan.md) — план роботи і розподіл на треки
 - [`docs/02-git-workflow.md`](docs/02-git-workflow.md) — як працює команда
 - [`docs/03-tool-contracts.md`](docs/03-tool-contracts.md) — Part C contracts
