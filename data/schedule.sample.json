@@ -1,0 +1,158 @@
+{
+  "sessions": [
+    {
+      "date": "2026-09-07",
+      "time_range": "09:00-10:20",
+      "course_code": "ECON301",
+      "course_title": "Intermediate Macroeconomics",
+      "group": "BE-3-1",
+      "kind": "lecture",
+      "room": "A-201",
+      "teacher": "Milovanov T.",
+      "topic": "IS-LM"
+    },
+    {
+      "date": "2026-09-07",
+      "time_range": "10:40-12:00",
+      "course_code": "STAT210",
+      "course_title": "Applied Statistics",
+      "group": "BE-3-1",
+      "kind": "seminar",
+      "room": "B-105",
+      "teacher": "Brik T.",
+      "topic": "Regression I"
+    },
+    {
+      "date": "2026-09-07",
+      "time_range": "14:00-15:20",
+      "course_code": "MGMT150",
+      "course_title": "Organisational Behaviour",
+      "group": "BE-3-2",
+      "kind": "seminar",
+      "room": "A-110",
+      "teacher": "Shapoval N.",
+      "topic": "Teams"
+    },
+    {
+      "date": "2026-09-08",
+      "time_range": "09:00-10:20",
+      "course_code": "FIN220",
+      "course_title": "Corporate Finance",
+      "group": "BE-3-1",
+      "kind": "lecture",
+      "room": "A-201",
+      "teacher": "Bilousova O.",
+      "topic": "WACC"
+    },
+    {
+      "date": "2026-09-08",
+      "time_range": "12:20-13:40",
+      "course_code": "MGMT150",
+      "course_title": "Organisational Behaviour",
+      "group": "BE-3-1",
+      "kind": "seminar",
+      "room": "A-110",
+      "teacher": "Shapoval N.",
+      "topic": "Teams"
+    },
+    {
+      "date": "2026-09-09",
+      "time_range": "09:00-10:20",
+      "course_code": "ECON301",
+      "course_title": "Intermediate Macroeconomics",
+      "group": "BE-3-2",
+      "kind": "lecture",
+      "room": "A-201",
+      "teacher": "Milovanov T.",
+      "topic": "IS-LM"
+    },
+    {
+      "date": "2026-09-09",
+      "time_range": "10:40-12:00",
+      "course_code": "STAT210",
+      "course_title": "Applied Statistics",
+      "group": "BE-3-2",
+      "kind": "seminar",
+      "room": "B-105",
+      "teacher": "Brik T.",
+      "topic": "Regression I"
+    },
+    {
+      "date": "2026-09-09",
+      "time_range": "14:00-15:20",
+      "course_code": "FIN220",
+      "course_title": "Corporate Finance",
+      "group": "BE-3-2",
+      "kind": "lecture",
+      "room": "A-201",
+      "teacher": "Bilousova O.",
+      "topic": "WACC"
+    },
+    {
+      "date": "2026-09-10",
+      "time_range": "09:00-10:20",
+      "course_code": "ECON301",
+      "course_title": "Intermediate Macroeconomics",
+      "group": "BE-3-3",
+      "kind": "lecture",
+      "room": "A-202",
+      "teacher": "Milovanov T.",
+      "topic": "IS-LM"
+    },
+    {
+      "date": "2026-09-10",
+      "time_range": "10:40-12:00",
+      "course_code": "MGMT150",
+      "course_title": "Organisational Behaviour",
+      "group": "BE-3-3",
+      "kind": "seminar",
+      "room": "A-110",
+      "teacher": "Shapoval N.",
+      "topic": "Teams"
+    },
+    {
+      "date": "2026-09-10",
+      "time_range": "12:20-13:40",
+      "course_code": "STAT210",
+      "course_title": "Applied Statistics",
+      "group": "BE-3-3",
+      "kind": "seminar",
+      "room": "B-105",
+      "teacher": "Brik T.",
+      "topic": "Regression I"
+    },
+    {
+      "date": "2026-09-11",
+      "time_range": "09:00-10:20",
+      "course_code": "FIN220",
+      "course_title": "Corporate Finance",
+      "group": "BE-3-3",
+      "kind": "lecture",
+      "room": "A-201",
+      "teacher": "Bilousova O.",
+      "topic": "WACC"
+    },
+    {
+      "date": "2026-09-11",
+      "time_range": "14:00-15:20",
+      "course_code": "ECON301",
+      "course_title": "Intermediate Macroeconomics",
+      "group": "BE-3-1",
+      "kind": "seminar",
+      "room": "A-203",
+      "teacher": "Milovanov T.",
+      "topic": "IS-LM app"
+    },
+    {
+      "date": "2026-09-12",
+      "time_range": "10:40-12:00",
+      "course_code": "ECON301",
+      "course_title": "Intermediate Macroeconomics",
+      "group": "BE-3-2",
+      "kind": "seminar",
+      "room": "A-203",
+      "teacher": "Milovanov T.",
+      "topic": "IS-LM app"
+    }
+  ]
+}

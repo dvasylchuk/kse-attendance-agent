@@ -1,0 +1,31 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Lint
+        run: ruff check .
+      - name: Tests (offline only - no network, no browser)
+        env:
+          OFFLINE_MODE: "true"
+          SCHEDULE_MCP_STATE_DIR: ./.state
+        run: pytest -q
+      - name: MCP server must start and expose its tools
+        run: python scripts/verify_mcp.py
+      - name: No secrets committed
+        run: |
+          if git grep -nEI "(sk-or-v1-[A-Za-z0-9]|api[_-]?key\s*=\s*[\"'][A-Za-z0-9]{16,})" -- . ':!*.example' ':!.github/workflows/*'; then
+            echo "::error::possible secret committed"; exit 1
+          fi

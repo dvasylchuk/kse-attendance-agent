@@ -1,0 +1,15 @@
+{
+  "student_id": "demo-student",
+  "home_group": "BE-3-1",
+  "required_courses": [
+    "ECON301",
+    "STAT210",
+    "MGMT150",
+    "FIN220"
+  ],
+  "preference": {
+    "max_campus_days": 3,
+    "min_coverage_ratio": 0.75,
+    "max_substitutions": 4
+  }
+}

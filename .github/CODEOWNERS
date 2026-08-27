@@ -1,0 +1,6 @@
+# Any teammate can approve. The owner is not a required reviewer, so work does
+# not queue behind one person.
+*                       @dvasylchuk
+/mcp_servers/           @dvasylchuk
+/agent/                 @dvasylchuk
+/docs/                  @dvasylchuk

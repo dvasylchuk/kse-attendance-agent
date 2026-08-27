@@ -1,0 +1,26 @@
+# secrets / local config
+.env
+.env.local
+*.local.json
+config.local.*
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# runtime state of the MCP server (snapshots, plans)
+.state/
+mcp_servers/schedule_mcp/.state/
+
+# node (playwright mcp)
+node_modules/
+
+# os / editors
+.DS_Store
+.idea/
+.vscode/

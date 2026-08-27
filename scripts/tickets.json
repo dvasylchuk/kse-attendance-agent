@@ -1,0 +1,98 @@
+{
+  "milestones": [
+    {"title": "M1 Custom MCP server", "description": "5 tools implemented, tested, error taxonomy honoured"},
+    {"title": "M2 Agent + Playwright", "description": "Both MCP connections in one coherent LangGraph flow"},
+    {"title": "M3 Documentation", "description": "Part C contracts, rationale, README, demo script"},
+    {"title": "M4 Defence readiness", "description": "End-to-end rehearsal, failure demo, rubric self-check"}
+  ],
+  "labels": [
+    {"name": "track:A-server", "color": "0E8A16", "description": "Custom MCP server"},
+    {"name": "track:B-agent", "color": "1D76DB", "description": "Agent + Playwright MCP"},
+    {"name": "track:C-docs", "color": "5319E7", "description": "Docs, fixtures, ops"},
+    {"name": "track:D-integration", "color": "B60205", "description": "Integration and defence"},
+    {"name": "status:ready", "color": "C2E0C6", "description": "Unblocked, free to take"},
+    {"name": "status:blocked", "color": "E99695", "description": "Waiting on a dependency"},
+    {"name": "status:in-progress", "color": "FBCA04", "description": "Claimed via /take"},
+    {"name": "status:review", "color": "FEF2C0", "description": "PR open"},
+    {"name": "rubric", "color": "D4C5F9", "description": "Directly scored by the assignment rubric"}
+  ],
+  "tickets": [
+    {"id": "A1", "title": "[A1] ingest_timetable_snapshot (DONE - reference implementation)", "track": "track:A-server", "milestone": "M1 Custom MCP server", "state": "closed", "deps": [],
+     "body": "Reference implementation already in the repo: `mcp_servers/schedule_mcp/tools/ingest.py`.\n\nRead it before starting A3-A5: it defines the house style for every other tool - envelope, warnings, error codes, and the empty-result rule.\n\n**DoD**: closed on repo creation."},
+
+    {"id": "A2", "title": "[A2] detect_timetable_changes (DONE - reference implementation)", "track": "track:A-server", "milestone": "M1 Custom MCP server", "state": "closed", "deps": [],
+     "body": "Reference implementation in `mcp_servers/schedule_mcp/tools/changes.py`.\n\nThis is the tool that makes the project robust to the university editing the timetable mid-term, and it is the tool whose result decides whether the agent re-plans.\n\n**DoD**: closed on repo creation."},
+
+    {"id": "A3", "title": "[A3] Implement detect_schedule_conflicts", "track": "track:A-server", "milestone": "M1 Custom MCP server", "deps": [],
+     "body": "Implement `mcp_servers/schedule_mcp/tools/conflicts.py`. The full specification is in that file's docstring; the contract is fixed in `schemas.CONFLICTS_INPUT/OUTPUT`.\n\n**Do not change the schema** without also updating `docs/03-tool-contracts.md` in the same PR.\n\n**Definition of done**\n- [ ] hard / soft / travel-gap / session-overlap conflicts all produced\n- [ ] zero conflicts returns `ok=true` with `conflict_count: 0` (never an error)\n- [ ] unknown `session_id` -> `INVALID_INPUT` listing the offending ids\n- [ ] missing calendar file -> `DATA_SOURCE_UNAVAILABLE`\n- [ ] `tests/test_conflicts.py` covers all five cases\n- [ ] `ruff check .` and `pytest` green"},
+
+    {"id": "A4", "title": "[A4] Implement optimize_attendance_plan", "track": "track:A-server", "milestone": "M1 Custom MCP server", "deps": ["A3"],
+     "body": "The core of the project. Full specification in the docstring of `mcp_servers/schedule_mcp/tools/optimize.py`.\n\nReuse `detect_schedule_conflicts` for the overlap maths - do not re-implement it.\n\n**Definition of done**\n- [ ] `balanced` objective beats the home-group baseline on the demo dataset (fewer campus days at >= 0.75 coverage)\n- [ ] every skipped required session carries a machine-readable reason\n- [ ] `max_campus_days: 1` reaches `INFEASIBLE` with the binding constraint in `details`\n- [ ] deterministic: same input -> same `plan_id`\n- [ ] `tests/test_optimizer.py` green"},
+
+    {"id": "A5", "title": "[A5] Implement compare_attendance_plans", "track": "track:A-server", "milestone": "M1 Custom MCP server", "deps": ["A4"],
+     "body": "Specification in the docstring of `mcp_servers/schedule_mcp/tools/compare.py`.\n\n**Definition of done**\n- [ ] verdict supported / contradicted / inconclusive derived from numbers only, no LLM inside the tool\n- [ ] plans from different snapshots produce a warning, never a silent comparison\n- [ ] `recommended_plan_id` rule implemented and documented\n- [ ] tests cover all three verdicts"},
+
+    {"id": "A6", "title": "[A6] Domain unit tests + deterministic fixtures", "track": "track:A-server", "milestone": "M1 Custom MCP server", "deps": ["A5"],
+     "body": "Round out `tests/` so the whole server is covered without a network or a browser.\n\n**Definition of done**\n- [ ] parser: malformed time, duplicate row, empty table, changed layout\n- [ ] store: snapshot round-trip, `SNAPSHOT_NOT_FOUND`\n- [ ] one test asserts every tool returns the envelope shape\n- [ ] `pytest` runs offline in under 10 seconds"},
+
+    {"id": "A7", "title": "[A7] Error-taxonomy review across all five tools", "track": "track:A-server", "milestone": "M1 Custom MCP server", "deps": ["A5"], "labels": ["rubric"],
+     "body": "Rubric section 6 scores whether failure is distinguishable from a successful empty result.\n\n**Definition of done**\n- [ ] a table in `docs/03-tool-contracts.md` mapping every tool to the error codes it can emit\n- [ ] no tool signals emptiness with an error, and no tool signals failure with an empty payload\n- [ ] `retryable` is set truthfully everywhere\n- [ ] one scripted command per error code that reproduces it"},
+
+    {"id": "B1", "title": "[B1] Verify Playwright MCP connection and record its real contract", "track": "track:B-agent", "milestone": "M2 Agent + Playwright", "deps": [], "labels": ["rubric"],
+     "body": "Start `npx -y @playwright/mcp@latest --headless --isolated` and run `python -m agent.run --discover-only`.\n\n**Definition of done**\n- [ ] both connections listed in the output, pasted into the PR description\n- [ ] the exact tool names + JSON schemas of the navigate and snapshot tools saved to `docs/playwright-tools.json` (dumped from the live server, not written from memory)\n- [ ] the pinned version recorded in the README"},
+
+    {"id": "B2", "title": "[B2] Implement PlaywrightTools.capture_timetable", "track": "track:B-agent", "milestone": "M2 Agent + Playwright", "deps": ["B1"],
+     "body": "Implement in `agent/tools_facade.py` using the tool names recorded in B1.\n\n**Definition of done**\n- [ ] navigates to `SCHEDULE_URL`, waits for `SCHEDULE_TABLE_SELECTOR`, returns the timetable markup\n- [ ] respects `SCRAPE_MIN_INTERVAL_SEC`\n- [ ] raises a typed error on: unreachable page, selector never appearing, browser failing to start\n- [ ] no credentials, no form submission, read-only navigation only"},
+
+    {"id": "B3", "title": "[B3] Implement the graph nodes conflicts / optimize / compare / report", "track": "track:B-agent", "milestone": "M2 Agent + Playwright", "deps": ["A5", "B2"],
+     "body": "Fill the `NotImplementedError` nodes in `agent/graph.py`.\n\n**Definition of done**\n- [ ] `optimize` builds BOTH a home-group baseline plan and an optimised plan, so `compare` has something to compare\n- [ ] on `INFEASIBLE`, relax `max_campus_days` by one and retry at most twice, then report the binding constraint\n- [ ] `report` only phrases numbers that exist in the state; no arithmetic in the prompt\n- [ ] every MCP call is logged with its arguments"},
+
+    {"id": "B4", "title": "[B4] Assemble and verify the LangGraph routing", "track": "track:B-agent", "milestone": "M2 Agent + Playwright", "deps": ["B3"], "labels": ["rubric"],
+     "body": "Rubric section 4 requires that tool results influence subsequent behaviour.\n\n**Definition of done**\n- [ ] `replan_required=false` demonstrably short-circuits straight to `report`\n- [ ] `replan_required=true` runs the full optimisation branch\n- [ ] a rendered graph diagram committed to `docs/img/graph.png` (or a mermaid block in `docs/06-architecture.md`)\n- [ ] `python -m agent.run --offline` completes end to end"},
+
+    {"id": "B5", "title": "[B5] Failure handling and offline replay mode", "track": "track:B-agent", "milestone": "M2 Agent + Playwright", "deps": ["B2"], "labels": ["rubric"],
+     "body": "Rubric section 5 requires a realistic, clearly surfaced failure of the existing MCP server.\n\n**Definition of done**\n- [ ] three reproducible failure modes: server not started, unreachable URL, selector that never matches\n- [ ] each one is reported to the user with the cause, and the run continues in degraded mode from the fixture\n- [ ] `degraded_reason` is visible in the final output - the user is never silently given fixture data as if it were live\n- [ ] `OFFLINE_MODE=true` never opens a socket\n- [ ] the fixture path goes through the same parser as the live path (documented in the PR)"},
+
+    {"id": "B6", "title": "[B6] Final report rendering via OpenRouter", "track": "track:B-agent", "milestone": "M2 Agent + Playwright", "deps": ["B3"],
+     "body": "**Definition of done**\n- [ ] model id read from `OPENROUTER_MODEL`, key from env, never committed\n- [ ] the report states: which days to come to campus, which group's session per course, what is skipped and why, and whether the stated preference was met\n- [ ] a `--json` flag prints the raw state instead, for tracing values at the defence\n- [ ] the run works with the LLM disabled (`--no-llm` prints a deterministic template)"},
+
+    {"id": "B7", "title": "[B7] CLI ergonomics for the defence", "track": "track:B-agent", "milestone": "M2 Agent + Playwright", "deps": ["B4"],
+     "body": "**Definition of done**\n- [ ] `--discover-only`, `--offline`, `--json`, `--previous-plan-id` all work\n- [ ] one flag switches the fixture between v1 and v2 so the change-detection loop can be shown live\n- [ ] output readable on a shared screen (no wall of JSON by default)"},
+
+    {"id": "C1", "title": "[C1] README: prerequisites, install, config, independent start commands", "track": "track:C-docs", "milestone": "M3 Documentation", "deps": [], "labels": ["rubric"],
+     "body": "Submission requirement 3.\n\n**Definition of done**\n- [ ] separate, copy-pasteable start commands for the custom server and for the agent\n- [ ] pinned Playwright MCP version\n- [ ] `.env.example` walkthrough, explicit statement that no secret is committed\n- [ ] a from-scratch clone reproduces the offline demo (verified by a teammate, not the author)"},
+
+    {"id": "C2", "title": "[C2] Part C contracts for all five custom tools", "track": "track:C-docs", "milestone": "M3 Documentation", "deps": ["A5"], "labels": ["rubric"],
+     "body": "Fill `docs/03-tool-contracts.md` using the exact eight-row table the assignment prescribes: Name, Purpose, Model-facing description, Input schema, Output schema, Error conditions, Side effects, Example.\n\n**Definition of done**\n- [ ] the model-facing description is copied verbatim from `server.py`, not paraphrased\n- [ ] every example input/output pair is a real captured call, not invented\n- [ ] side effects stated explicitly, including 'none'"},
+
+    {"id": "C3", "title": "[C3] Document the Playwright MCP tool contract in project context", "track": "track:C-docs", "milestone": "M3 Documentation", "deps": ["B1"], "labels": ["rubric"],
+     "body": "Part A requires an explanation of one existing tool's name, description, arguments and constraints, returned content, error conditions and side effects - written in the context of THIS project.\n\n**Definition of done**\n- [ ] one navigate/snapshot tool documented from the dumped schema in `docs/playwright-tools.json`\n- [ ] a paragraph justifying why a browser-driving server is the right choice here (no public timetable API)\n- [ ] the safety boundary stated: public page only, read-only, no credentials"},
+
+    {"id": "C4", "title": "[C4] Design rationale", "track": "track:C-docs", "milestone": "M3 Documentation", "deps": ["A5", "B4"], "labels": ["rubric"],
+     "body": "Submission requirement 6.\n\n**Definition of done**\n- [ ] why the existing server is relevant\n- [ ] why each custom tool belongs at the MCP boundary rather than inside the agent\n- [ ] how the tool set supports the workflow (the replan loop specifically)\n- [ ] trade-offs and known limitations, stated honestly"},
+
+    {"id": "C5", "title": "[C5] Defence script and demo checklist", "track": "track:C-docs", "milestone": "M4 Defence readiness", "deps": ["B4"], "labels": ["rubric"],
+     "body": "Submission requirement 7, and it maps 1:1 to the nine numbered demo steps in the assignment.\n\n**Definition of done**\n- [ ] a timed script matching the 2 / 2-3 / 3-4 / 2 / 3-4 minute segments\n- [ ] the exact commands to type, in order\n- [ ] one changed valid input and one invalid input identified in advance\n- [ ] one value chosen to trace from source page to final output"},
+
+    {"id": "C6", "title": "[C6] Fixtures and replay instructions", "track": "track:C-docs", "milestone": "M3 Documentation", "deps": ["B5"], "labels": ["rubric"],
+     "body": "**Definition of done**\n- [ ] `fixtures/README.md` explains how each fixture was recorded and how to re-record it\n- [ ] explicit statement (and proof) that replay uses the same parsing path, not a canned answer\n- [ ] the demo dataset documented as the deterministic input"},
+
+    {"id": "C7", "title": "[C7] Operational and security review", "track": "track:C-docs", "milestone": "M4 Defence readiness", "deps": [], "labels": ["rubric"],
+     "body": "Part D.\n\n**Definition of done**\n- [ ] `git log -p | grep -Ei 'sk-|api[_-]?key|token'` clean across the whole history\n- [ ] `.env` ignored and never committed; `.env.example` complete\n- [ ] rate limiting present and documented\n- [ ] side effects of the custom server limited to `.state/`, which is git-ignored"},
+
+    {"id": "C8", "title": "[C8] Rubric self-check", "track": "track:C-docs", "milestone": "M4 Defence readiness", "deps": ["C2", "C4", "C5"], "labels": ["rubric"],
+     "body": "Go through `docs/07-rubric-selfcheck.md` and mark every row with evidence (file path, command, or timestamp in the demo script). Anything unproven becomes a new ticket.\n\n**Definition of done**\n- [ ] all four minimum-condition rules verifiably satisfied\n- [ ] every rubric row has a concrete piece of evidence"},
+
+    {"id": "D1", "title": "[D1] End-to-end rehearsal, offline", "track": "track:D-integration", "milestone": "M4 Defence readiness", "deps": ["B4", "A6"],
+     "body": "Fresh clone, fresh venv, `OFFLINE_MODE=true`, full run, on a machine that is not the author's.\n\n**Definition of done**\n- [ ] server started independently in one terminal, agent in another\n- [ ] the whole nine-step demo sequence performed once without edits\n- [ ] every deviation from the script filed as a ticket"},
+
+    {"id": "D2", "title": "[D2] End-to-end rehearsal, live page", "track": "track:D-integration", "milestone": "M4 Defence readiness", "deps": ["D1"],
+     "body": "Same as D1 but against the real timetable URL through Playwright MCP.\n\n**Definition of done**\n- [ ] a live snapshot ingested and used in the plan\n- [ ] a value traced from a cell on the page to a line of the final report\n- [ ] the run repeated twice to confirm identical snapshot_id when the page is unchanged"},
+
+    {"id": "D3", "title": "[D3] Failure-scenario rehearsal", "track": "track:D-integration", "milestone": "M4 Defence readiness", "deps": ["B5"], "labels": ["rubric"],
+     "body": "**Definition of done**\n- [ ] Playwright MCP not started -> agent reports it and degrades, on camera\n- [ ] invalid tool input rejected at the MCP schema layer -> message shown\n- [ ] `INFEASIBLE` from the optimiser -> agent relaxes a constraint and retries\n- [ ] each one reproducible with a single documented command"},
+
+    {"id": "D4", "title": "[D4] Final repository review before submission", "track": "track:D-integration", "milestone": "M4 Defence readiness", "deps": ["C8", "D2", "D3"],
+     "body": "**Definition of done**\n- [ ] every submission item (1-7) present and linked from the README\n- [ ] no open ticket labelled `rubric`\n- [ ] repository readable by someone who has never seen it: a teammate follows the README cold and succeeds"}
+  ]
+}

@@ -1,0 +1,48 @@
+name: ticket-claim
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+
+jobs:
+  take:
+    if: github.event.issue.pull_request == null && startsWith(github.event.comment.body, '/take')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign the commenter and mark the ticket in progress
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUM: ${{ github.event.issue.number }}
+          WHO: ${{ github.event.comment.user.login }}
+        run: |
+          if gh issue view "$NUM" --repo "$REPO" --json labels -q '.labels[].name' | grep -qx 'status:blocked'; then
+            gh issue comment "$NUM" --repo "$REPO" --body \
+              "@$WHO this ticket is still \`status:blocked\`. Close its dependencies first, or say why the block no longer applies."
+            exit 0
+          fi
+          ASSIGNEES=$(gh issue view "$NUM" --repo "$REPO" --json assignees -q '.assignees | length')
+          if [ "$ASSIGNEES" != "0" ]; then
+            gh issue comment "$NUM" --repo "$REPO" --body "@$WHO already claimed by someone else - pick another \`status:ready\` ticket."
+            exit 0
+          fi
+          gh issue edit "$NUM" --repo "$REPO" --add-assignee "$WHO" \
+            --add-label status:in-progress --remove-label status:ready
+          gh issue comment "$NUM" --repo "$REPO" --body \
+            "Claimed by @$WHO. Branch: \`git switch -c $(gh issue view "$NUM" --repo "$REPO" --json title -q '.title' | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//' | cut -c1-40)-$NUM\`"
+
+  release:
+    if: github.event.issue.pull_request == null && startsWith(github.event.comment.body, '/drop')
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUM: ${{ github.event.issue.number }}
+          WHO: ${{ github.event.comment.user.login }}
+        run: |
+          gh issue edit "$NUM" --repo "$REPO" --remove-assignee "$WHO" \
+            --add-label status:ready --remove-label status:in-progress
+          gh issue comment "$NUM" --repo "$REPO" --body "Released by @$WHO - free to take."
