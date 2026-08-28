@@ -70,6 +70,51 @@ cp .env.example .env          # fill in OPENROUTER_API_KEY and SCHEDULE_URL
 No secret is committed. `.env` is git-ignored; `.env.example` documents every
 variable.
 
+## Target schedule page (ticket B0)
+
+`SCHEDULE_URL` in your own `.env` should point at:
+
+```
+https://schedule.kse.ua/?date=YYYY-MM-DD&discipline=<COURSE_CODE>
+```
+
+Confirmed live, 2026-08-28: public, no login required to view a discipline's
+sessions. Three things this confirmation surfaced that shape how B2 and the
+domain parser have to work:
+
+- **There is no default full-timetable view.** The page shows nothing until a
+  discipline is chosen via its search box (e.g. `discipline=ECON201`); there
+  is no "browse everything" mode for an anonymous visitor.
+- **Teacher and room are hidden without login.** Every session card carries a
+  lock icon labelled "Увійдіть, щоб побачити викладачів та аудиторії" ("Log
+  in to see teachers and rooms"). `ingest_timetable_snapshot` correctly
+  stores these as `null` for sessions captured from this page — it does not
+  invent placeholder values.
+- **The group field is course-relative, not institutional.** The page only
+  exposes "гр.1" / "гр.2" (this course's own group numbering), not the
+  `BE-3-1`-style group codes used elsewhere in this project's domain model.
+  Sessions parsed from the real page get `GR1` / `GR2` etc.; matching that
+  against a student's actual home group is not something the source page can
+  answer, and is out of scope for B0.
+
+The page is a CSS grid (`.schedule-event-card` divs inside `.schedule-grid-cell`),
+not a `<table>`. `parser.html_to_rows` (in `mcp_servers/schedule_mcp/domain/`)
+detects this automatically — no config change needed — and is tested against
+a real capture at
+[`fixtures/playwright/kse_schedule_real_2026-09-10.html`](fixtures/playwright/kse_schedule_real_2026-09-10.html)
+in `tests/test_kse_grid_parser.py`. The exact CSS classes and grid layout it
+depends on are recorded in
+[`docs/00-execution-plan.md`](docs/00-execution-plan.md).
+
+**Fallback if the real page's layout changes before the defence:** offline
+mode (below) never depends on the live site — it replays a recorded fixture
+through this same parser. If `schedule.kse.ua` changes its markup, capture a
+fresh page (`python -m agent.run --discover-only` proves the connection,
+then a Playwright MCP `navigate` + `evaluate(outerHTML)` captures the page),
+save it under `fixtures/playwright/`, and add a test pinning the new
+structure the same way `test_kse_grid_parser.py` does — the demo itself can
+run entirely offline regardless.
+
 ## Start the two processes independently
 
 **Terminal 1 — the custom MCP server** (this is what the defence starts first):
@@ -84,11 +129,19 @@ It speaks MCP over stdio and logs to stderr. To verify it without the agent:
 python scripts/verify_mcp.py
 ```
 
-**Terminal 2 — the Playwright MCP server** (pinned version):
+**Terminal 2 — the Playwright MCP server**:
 
 ```bash
 npx -y @playwright/mcp@latest --headless --isolated
 ```
+
+Verified against `@playwright/mcp` **0.0.79** (`npx -y @playwright/mcp@latest --version`,
+2026-08-28). `@latest` is what every machine launches, so this number is a
+snapshot of what it resolved to when last verified, not a lockfile pin — if a
+newer release changes tool names or schemas, re-run
+`python -m agent.run --discover-only` and re-check
+[`docs/playwright-tools.json`](docs/playwright-tools.json), which holds the
+`browser_navigate` / `browser_snapshot` contracts dumped from the live server.
 
 **Terminal 3 — the agent:**
 
@@ -116,7 +169,7 @@ returns a prewritten answer. See [`fixtures/README.md`](fixtures/README.md).
 | `mcp_servers/schedule_mcp/` | the custom MCP server: `server.py`, `schemas.py`, `errors.py`, `tools/`, `domain/` |
 | `agent/` | LangGraph flow, MCP client wiring, CLI |
 | `data/` | deterministic demo dataset and sample `.ics` calendar |
-| `fixtures/playwright/` | recorded timetable pages (v1, v2, broken) |
+| `fixtures/playwright/` | recorded timetable pages (v1, v2, broken, and a real schedule.kse.ua capture) |
 | `docs/` | plan, git workflow, tool contracts, rationale, demo script, rubric self-check |
 | `scripts/` | GitHub bootstrap, ticket helpers, MCP verification, demo-data generator |
 | `tests/` | offline unit tests |
