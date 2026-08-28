@@ -1,0 +1,3 @@
+{"snapshot_id": "snap_a1296ab47ac4", "captured_at": "2026-08-28T09:28:11.494941+00:00", "source": "local_dataset", "source_ref": "data/schedule.sample.json", "sessions": 14}
+{"snapshot_id": "snap_38244b758da5", "captured_at": "2026-08-28T09:28:11.517031+00:00", "source": "fixture", "source_ref": "fixtures/playwright/schedule_page_v1.html", "sessions": 14}
+{"snapshot_id": "snap_08044e32b73c", "captured_at": "2026-08-28T09:28:11.545897+00:00", "source": "fixture", "source_ref": "fixtures/playwright/schedule_page_v2.html", "sessions": 15}
