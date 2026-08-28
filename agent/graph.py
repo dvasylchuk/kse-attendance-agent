@@ -16,13 +16,18 @@ OPEN TICKETS on this file: B3 (nodes), B4 (routing), B5 (failure paths).
 
 from __future__ import annotations
 
-import asyncio
+from datetime import datetime
 from typing import Annotated, Any, Literal, TypedDict
+from zoneinfo import ZoneInfo
 
 from langgraph.graph import END, START, StateGraph
 
 from .config import CONFIG
 from .tools_facade import PlaywrightTools, ScheduleTools
+
+# schedule.kse.ua's own timezone (ticket B2b) - "today" must mean Kyiv-local
+# today regardless of which machine the agent runs on, not the host's zone.
+KYIV_TZ = ZoneInfo("Europe/Kyiv")
 
 
 class RunState(TypedDict, total=False):
@@ -61,9 +66,22 @@ async def capture_page(state: RunState, pw: PlaywrightTools) -> dict[str, Any]:
             "capture_source": "fixture",
             "degraded_reason": "OFFLINE_MODE=true",
         }
+    required_courses = state.get("required_courses") or []
+    if not required_courses:
+        # schedule.kse.ua has no unfiltered view (ticket B0): capture_full_week
+        # needs at least one discipline to visit. An empty course list is a
+        # misconfigured student profile, not "nothing to do" - degrade loudly
+        # rather than silently navigating a discipline-less URL that would
+        # only ever show an empty page.
+        return {
+            "raw_html": CONFIG.fixture_v1.read_text(encoding="utf-8"),
+            "capture_source": "fixture",
+            "degraded_reason": "required_courses is empty; nothing to capture from schedule.kse.ua",
+            "errors": [{"stage": "capture_page", "error": "required_courses is empty"}],
+        }
     try:
-        await asyncio.sleep(CONFIG.scrape_min_interval_sec)  # respect the site
-        html = await pw.capture_timetable(CONFIG.schedule_url, CONFIG.table_selector)
+        today_kyiv = datetime.now(KYIV_TZ).date().isoformat()
+        html = await pw.capture_full_week(CONFIG.schedule_url, required_courses, today_kyiv)
         return {"raw_html": html, "capture_source": "playwright", "degraded_reason": None}
     except Exception as exc:  # noqa: BLE001
         return {

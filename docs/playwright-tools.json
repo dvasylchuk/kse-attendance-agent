@@ -21,7 +21,12 @@
     ],
     "real_capture": "fixtures/playwright/kse_schedule_real_2026-09-10.html",
     "parser": "mcp_servers/schedule_mcp/domain/parser.py (_kse_grid_rows, auto-detected when no <table> matches the configured selector)",
-    "tested_by": "tests/test_kse_grid_parser.py"
+    "tested_by": "tests/test_kse_grid_parser.py",
+    "ticket_B2b_discipline_sweep": [
+      "Confirmed live against a random sample of 20 codes drawn from the full current-term catalog (api.kse.today's own search endpoint, 188 unique codes found via a 26-query a-z probe - a lower bound, since each query caps at 20 results): roughly half of any given sample have zero sessions in an arbitrary week. A discipline having zero sessions that week is therefore the COMMON case, not an edge case, and PlaywrightTools.capture_full_week must not wait on '.schedule-event-card' itself or it would time out on every one of them.",
+      "capture_full_week instead waits for '.schedule-grid-header' (a day-of-week column header) - confirmed always present whenever the grid itself rendered, independent of whether this particular discipline has any sessions, and required unconditionally by _kse_grid_rows too. Once that anchor is confirmed present, whether this discipline has any sessions is decided by counting '.schedule-event-card' elements directly in the captured HTML (not by matching html_to_rows' error text, which would silently misclassify any future rewording of that message as 'no sessions'): zero cards is skipped as a legitimate empty result, and any ToolError html_to_rows does raise when cards ARE present propagates unconditionally, tagged with the discipline code.",
+      "Concrete real evidence of within-course multi-session variation across groups/times (see docs/00-execution-plan.md and the B2b PR body for the full example): ECON201 alone has group 1 meeting Mon 08:30-09:50 and Tue 10:30-11:50 (different day, same slot number by coincidence) while group 2 meets Mon 10:30-11:50 and Tue 12:00-13:20 - confirmed against both the committed fixture capture and the underlying api.kse.today/schedule JSON the page itself calls."
+    ]
   },
   "browser_navigate": {
     "name": "browser_navigate",

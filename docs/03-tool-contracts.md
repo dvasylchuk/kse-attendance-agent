@@ -168,3 +168,14 @@ produce a nice-looking answer.
 started. The agent reports the failed connection, records
 `degraded_reason`, and continues from the recorded fixture — and it says so in
 the final output, so the user is never handed fixture data as if it were live.
+
+**Known limitation of the public source (ticket B0/B2, confirmed live —
+not a parser bug):** `room` and `teacher` are hidden by schedule.kse.ua
+itself for an unauthenticated visitor (`aria-label="Увійдіть, щоб побачити
+викладачів та аудиторії"`, and the `/schedule` JSON API the page calls
+internally simply omits both fields — confirmed by inspecting that request
+directly, not just the rendered DOM). `Session.room` and `Session.teacher`
+are `Optional` for exactly this reason: the parser must not invent
+placeholder values for them, and every downstream tool
+(`detect_schedule_conflicts`, `optimize_attendance_plan`) must treat their
+absence as "unknown", never as "no room" / "no teacher".
