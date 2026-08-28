@@ -39,6 +39,17 @@ class Config:
     scrape_min_interval_sec: float = field(
         default_factory=lambda: float(os.environ.get("SCRAPE_MIN_INTERVAL_SEC", "3"))
     )
+    # How long capture_timetable waits for SCHEDULE_TABLE_SELECTOR to appear
+    # before raising SelectorNeverAppearedError: (attempts - 1) * interval
+    # seconds, since no wait follows the last attempt. Configurable because a
+    # client-rendered page (e.g. schedule.kse.ua after a discipline search)
+    # can take longer than a static fixture ever would.
+    selector_poll_attempts: int = field(
+        default_factory=lambda: int(os.environ.get("SELECTOR_POLL_ATTEMPTS", "10"))
+    )
+    selector_poll_interval_sec: float = field(
+        default_factory=lambda: float(os.environ.get("SELECTOR_POLL_INTERVAL_SEC", "2"))
+    )
 
     def require_llm(self) -> None:
         if not self.openrouter_api_key:
