@@ -10,6 +10,9 @@ jobs:
   take:
     if: github.event.issue.pull_request == null && startsWith(github.event.comment.body, '/take')
     runs-on: ubuntu-latest
+    concurrency:
+      group: take-${{ github.event.issue.number }}
+      cancel-in-progress: false
     steps:
       - name: Claim the ticket for one machine / session
         env:
@@ -36,7 +39,7 @@ jobs:
 
           if printf '%s\n' "$LABELS" | grep -qx 'status:in-progress'; then
             HOLDER=$(gh issue view "$NUM" --repo "$REPO" --json comments \
-                     -q '[.comments[] | select(.body | startswith("Claimed by session"))] | last | .body' 2>/dev/null || true)
+                     -q '[.comments[] | select(.body | startswith("Claimed by session"))] | last | .body // empty' 2>/dev/null || true)
             gh issue comment "$NUM" --repo "$REPO" --body \
               "Already claimed. ${HOLDER:-Another session holds this ticket.} Pick another \`status:ready\` ticket, or release it with \`/drop\`."
             exit 0
@@ -50,9 +53,9 @@ jobs:
           gh issue comment "$NUM" --repo "$REPO" --body \
             "Claimed by session \`$AGENT\` (@$WHO).
 
-Branch: \`git switch -c $AGENT/$SLUG-$NUM\`
+          Branch: \`git switch -c $AGENT/$SLUG-$NUM\`
 
-No other session should start this ticket until it closes or someone comments \`/drop\`."
+          No other session should start this ticket until it closes or someone comments \`/drop\`."
 
   release:
     if: github.event.issue.pull_request == null && startsWith(github.event.comment.body, '/drop')
