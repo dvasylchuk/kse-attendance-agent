@@ -1,12 +1,12 @@
 {
   "_meta": {
-    "source": "live stdio server, dumped via session.list_tools() (see scripts/dump results in PR #9)",
+    "source": "live stdio server, dumped via a throwaway MCP client calling session.list_tools() (not written from memory or docs)",
     "server_command": "npx -y @playwright/mcp@latest --headless --isolated",
     "resolved_version": "0.0.79",
     "resolved_via": "npx -y @playwright/mcp@latest --version",
     "dumped_at": "2026-08-28",
     "total_tools_discovered": 24,
-    "note": "This file records only the two tools this ticket requires (navigate, snapshot), verbatim from the live server. The full 24-tool list was confirmed via `python -m agent.run --discover-only`."
+    "note": "This file records only the two tools this ticket requires (navigate, snapshot). Fields kept: name, description, inputSchema, outputSchema, annotations - the ones the live server actually populates. Fields dropped: title, icons, _meta, execution - these come back null on every tool in this server's response and are MCP SDK object boilerplate, not server-specific data. The full 24-tool list was confirmed via `python -m agent.run --discover-only`."
   },
   "browser_navigate": {
     "name": "browser_navigate",
@@ -25,7 +25,14 @@
       ],
       "additionalProperties": false
     },
-    "outputSchema": null
+    "outputSchema": null,
+    "annotations": {
+      "title": "Navigate to a URL",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": null,
+      "openWorldHint": true
+    }
   },
   "browser_snapshot": {
     "name": "browser_snapshot",
@@ -53,6 +60,13 @@
       },
       "additionalProperties": false
     },
-    "outputSchema": null
+    "outputSchema": null,
+    "annotations": {
+      "title": "Page snapshot",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": null,
+      "openWorldHint": true
+    }
   }
 }
