@@ -114,6 +114,8 @@ TOOLS: list[Tool] = [
     ),
 ]
 
+TOOLS_BY_NAME: dict[str, Tool] = {t.name: t for t in TOOLS}
+
 app = Server(SERVER_NAME, version=SERVER_VERSION)
 
 
@@ -135,6 +137,23 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, An
         ).to_payload()
 
     log.info("call %s args=%s", name, sorted(args))
+
+    # A required top-level argument is absent. The MCP SDK's own inputSchema
+    # validation catches this before a real client ever reaches the handler,
+    # but a handler invoked directly (unit tests, a future direct import from
+    # agent/) has no such gate - so it is checked explicitly here, rather than
+    # via a broad `except KeyError` around the handler call, which would also
+    # swallow an unrelated KeyError raised by a genuine bug deep inside the
+    # tool's own logic and misreport it as a client mistake.
+    missing = sorted(set(TOOLS_BY_NAME[name].inputSchema.get("required", [])) - set(args))
+    if missing:
+        log.warning("%s missing required argument(s): %s", name, missing)
+        return ToolError(
+            ErrorCode.INVALID_INPUT,
+            f"missing required argument(s): {missing}",
+            details={"missing_arguments": missing},
+        ).to_payload()
+
     try:
         # Tools are synchronous CPU/IO-bound work; keep the event loop free.
         payload = await asyncio.to_thread(handler, args)

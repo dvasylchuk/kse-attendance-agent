@@ -29,16 +29,23 @@ The agent normalises that into the same envelope with code `INVALID_INPUT`
 
 ### Error codes by tool
 
-| Code | ingest | changes | conflicts | optimize | compare | Meaning |
-|---|:-:|:-:|:-:|:-:|:-:|---|
-| `INVALID_INPUT` | ● | ● | ● | ● | ● | schema-valid but domain-invalid arguments |
-| `PARSE_FAILED` | ● | | | | | markup or dataset could not be parsed |
-| `DATA_SOURCE_UNAVAILABLE` | ● | | ● | ● | | dataset or calendar file missing/unreadable |
-| `SNAPSHOT_NOT_FOUND` | | ● | ● | ● | | unknown `snapshot_id` |
-| `PLAN_NOT_FOUND` | | ● | | | ● | unknown `plan_id` |
-| `INFEASIBLE` | | | | ● | | constraints admit no plan |
-| `NOT_IMPLEMENTED` | | | ● | ● | ● | open ticket (A3/A4/A5) — removed on completion |
-| `INTERNAL` | ● | ● | ● | ● | ● | unexpected exception, `retryable: true` |
+*Reviewed for ticket A7 against the actual `raise ToolError(...)` call sites in
+`mcp_servers/schedule_mcp/` (tools + `domain/`), not from memory. Reproduce
+every row below with `python scripts/repro_errors.py`.*
+
+| Code | ingest | changes | conflicts | optimize | compare | `retryable` | Meaning |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|---|
+| `INVALID_INPUT` | ● | ● | ● | ● | ● | always `false` | schema-valid but domain-invalid arguments, or a required argument missing entirely (caught centrally in `server.py`) — retrying the identical call can never succeed, so this is never retryable |
+| `PARSE_FAILED` | ● | | ● | ● | | always `false` | markup, dataset or `.ics` calendar could not be parsed. `conflicts` and `optimize` inherit this from `domain/calendar.py` (an invalid calendar file), not just `ingest`'s own HTML/JSON parsing |
+| `DATA_SOURCE_UNAVAILABLE` | ● | | ● | ● | | always `false` | dataset or calendar file missing/unreadable; the path does not change on retry |
+| `SNAPSHOT_NOT_FOUND` | | ● | ● | ● | | always `false` | unknown `snapshot_id` |
+| `PLAN_NOT_FOUND` | | ● | | | ● | always `false` | unknown `plan_id` |
+| `INFEASIBLE` | | | | ● | | always `false` | constraints admit no plan; relax `max_campus_days` or `min_coverage_ratio` and call again — retrying unchanged never helps |
+| `INTERNAL` | ● | ● | ● | ● | ● | always `true` | unexpected, unclassified exception — the one case where blind retry is plausibly worth it |
+
+`NOT_IMPLEMENTED` existed while A3/A4/A5 were open stubs; no tool raises it
+any more (the constant stays defined in `errors.py` for any future ticket that
+reopens a stub).
 
 ---
 
@@ -106,7 +113,7 @@ cancelled, it was rescheduled, and the student still needs it.
 | **Model-facing description** | "Build an attendance plan that covers the required courses in as few days on campus as possible, allowed to substitute another study group's session of the same course when the topic matches. Honours a hard cap on campus days, a minimum coverage ratio and the student's calendar. Returns the chosen session per course, the campus days, the coverage ratio, the substitutions used and a reason for every skipped session. Fails with INFEASIBLE when the constraints admit no plan — relax max_campus_days or min_coverage_ratio and call again." |
 | **Input schema** | `snapshot_id`, `home_group`, `required_courses` (1–20) — **required**; `objective` (`min_days` \| `max_coverage` \| `balanced`, default `balanced`); `max_campus_days` (int 1–6, default 3); `min_coverage_ratio` (number 0–1, default 0.7); `allow_cross_group` (bool, default `true`); `calendar_path`; `min_gap_minutes` (int 0–240, default 30). |
 | **Output schema** | `data.plan_id`, `objective`, `items[]` (`{course_code, session_id, group, substituted, date, start, end}`), `campus_days[]`, `campus_day_count`, `coverage_ratio`, `covered_sessions`, `required_sessions`, `substitutions_used`, `skipped[]` (`{session_id, reason}`). |
-| **Error conditions** | `SNAPSHOT_NOT_FOUND`; `INVALID_INPUT` when `home_group` is absent from the snapshot or a required course has no sessions; `INFEASIBLE` when the best achievable coverage is below `min_coverage_ratio` — `details` carries the best ratio and the binding constraint, so the agent knows *which* constraint to relax. |
+| **Error conditions** | `SNAPSHOT_NOT_FOUND`; `INVALID_INPUT` when `home_group` is absent from the snapshot or a required course has no sessions; `INFEASIBLE` when the best achievable coverage is below `min_coverage_ratio` — `details` carries the best ratio and the binding constraint, so the agent knows *which* constraint to relax. It calls `detect_schedule_conflicts` internally to drop calendar-blocked candidates, so a `DATA_SOURCE_UNAVAILABLE` or `PARSE_FAILED` calendar failure propagates unchanged. |
 | **Side effects** | Writes `.state/plans/<plan_id>.json`. Deterministic: identical input yields an identical `plan_id`. |
 | **Example** | *(to be filled from a real captured call when A4 lands — see ticket C2)* |
 
