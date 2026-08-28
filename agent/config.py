@@ -39,11 +39,14 @@ class Config:
     scrape_min_interval_sec: float = field(
         default_factory=lambda: float(os.environ.get("SCRAPE_MIN_INTERVAL_SEC", "3"))
     )
-    # How long capture_timetable waits for SCHEDULE_TABLE_SELECTOR to appear
+    # How long capture_timetable waits for its selector argument to appear
     # before raising SelectorNeverAppearedError: (attempts - 1) * interval
     # seconds, since no wait follows the last attempt. Configurable because a
     # client-rendered page (e.g. schedule.kse.ua after a discipline search)
-    # can take longer than a static fixture ever would.
+    # can take longer than a static fixture ever would. The selector waited
+    # on is whatever the caller passes - SCHEDULE_TABLE_SELECTOR for a direct
+    # capture_timetable call, or capture_full_week's own hardcoded
+    # `.schedule-grid-header` for the live discipline sweep (ticket B2b).
     selector_poll_attempts: int = field(
         default_factory=lambda: int(os.environ.get("SELECTOR_POLL_ATTEMPTS", "10"))
     )
