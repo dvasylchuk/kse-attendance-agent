@@ -193,6 +193,16 @@ def _kse_grid_rows(soup: BeautifulSoup, source_ref: str | None) -> list[dict[str
     exposes a *relative* group number ("гр.1"/"гр.2"), not the institutional
     group code (e.g. BE-3-1) used elsewhere in this domain, and teacher/room
     are hidden by the site itself unless logged in - both come back as None.
+
+    Two failure modes are deliberately distinguished rather than both being
+    "silently drop the row": if EVERY event card fails to match the expected
+    aria-label shape, that means the label format itself changed, and this
+    raises PARSE_FAILED immediately - the alternative (returning zero rows)
+    would look identical to "this student genuinely has no classes this
+    week" downstream. If only SOME cards fail to match, each one is turned
+    into a row that is guaranteed to fail Session validation with the raw
+    label in the message, so it surfaces as a row-level warning through the
+    normal tolerance path in rows_to_sessions instead of being lost.
     """
     calendar_node = soup.select_one("calendar-date[value]")
     raw_date = calendar_node["value"] if calendar_node else None
@@ -207,6 +217,25 @@ def _kse_grid_rows(soup: BeautifulSoup, source_ref: str | None) -> list[dict[str
     anchor = date.fromisoformat(m.group(1))
     week_start = anchor - timedelta(days=anchor.weekday())
 
+    headers: list[int] = []
+    for node in soup.select(".schedule-grid-header"):
+        day_spans = [s.get_text(strip=True) for s in node.find_all("span")]
+        if len(day_spans) < 2 or not day_spans[-1].isdigit():
+            raise ToolError(ErrorCode.PARSE_FAILED, "a day-of-week header has no day-of-month number")
+        headers.append(int(day_spans[-1]))
+    if not headers:
+        raise ToolError(ErrorCode.PARSE_FAILED, "no day-of-week header ('schedule-grid-header') found in the grid")
+    for i, day_of_month in enumerate(headers):
+        expected = (week_start + timedelta(days=i)).day
+        if day_of_month != expected:
+            raise ToolError(
+                ErrorCode.PARSE_FAILED,
+                "grid header date does not match the anchor week; "
+                "<calendar-date value=...> may be stale relative to the rendered grid",
+                details={"column": i, "header_day": day_of_month, "expected_day": expected},
+            )
+    n_days = len(headers)
+
     slot_times: list[tuple[str, str]] = []
     for node in soup.select('[aria-label^="Час пари"]'):
         parts = [d.get_text(strip=True) for d in node.find_all("div", recursive=False) if d.get_text(strip=True)]
@@ -215,18 +244,18 @@ def _kse_grid_rows(soup: BeautifulSoup, source_ref: str | None) -> list[dict[str
         slot_times.append((parts[0], parts[-1]))
     if not slot_times:
         raise ToolError(ErrorCode.PARSE_FAILED, "no time-slot legend ('Час пари N') found in the grid")
+    n_slots = len(slot_times)
 
     cells = soup.select(".schedule-grid-cell")
-    n_slots = len(slot_times)
-    if not cells or len(cells) % n_slots != 0:
+    if not cells or len(cells) != n_slots * n_days:
         raise ToolError(
             ErrorCode.PARSE_FAILED,
-            "grid cell count is not a multiple of the time-slot count; layout likely changed",
-            details={"cells": len(cells), "slots": n_slots},
+            "grid cell count does not match time-slots x day-headers; layout likely changed",
+            details={"cells": len(cells), "slots": n_slots, "days": n_days},
         )
-    n_days = len(cells) // n_slots
 
     rows: list[dict[str, Any]] = []
+    unmatched_labels: list[str] = []
     for idx, cell in enumerate(cells):
         slot_idx, day_idx = divmod(idx, n_days)
         start_s, end_s = slot_times[slot_idx]
@@ -235,17 +264,32 @@ def _kse_grid_rows(soup: BeautifulSoup, source_ref: str | None) -> list[dict[str
             label = (card.get("aria-label") or "").strip()
             match = _KSE_CARD_RE.match(label)
             if not match:
+                unmatched_labels.append(label or "<empty aria-label>")
                 continue
+            group = match.group("group")
             rows.append(
                 {
                     "date": session_date.isoformat(),
                     "time_range": f"{start_s}-{end_s}",
                     "course_code": match.group("code"),
                     "course_title": match.group("title"),
-                    "group": f"GR{match.group('group')}" if match.group("group") else "",
+                    "group": f"GR{group}" if group else "GR0",
                     "kind": match.group("kind"),
                 }
             )
+
+    if unmatched_labels and not rows:
+        raise ToolError(
+            ErrorCode.PARSE_FAILED,
+            "schedule.kse.ua event cards did not match the expected aria-label "
+            "format ('CODE · Title · Kind, гр.N'); the page layout most likely changed",
+            details={"unmatched_labels": unmatched_labels[:10]},
+        )
+    for label in unmatched_labels:
+        # date deliberately unparsable: rows_to_sessions rejects this row and
+        # its warning message carries the raw label, instead of the row
+        # being lost with no trace.
+        rows.append({"date": f"unrecognised schedule.kse.ua event card: {label}"})
     return rows
 
 

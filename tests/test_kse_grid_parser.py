@@ -6,6 +6,8 @@ not a hand-written stand-in.
 
 from datetime import date
 
+import pytest
+
 from mcp_servers.schedule_mcp.domain import parser
 from mcp_servers.schedule_mcp.errors import ErrorCode, ToolError
 from mcp_servers.schedule_mcp.tools.ingest import ingest_timetable_snapshot
@@ -46,9 +48,67 @@ def test_grid_rows_fall_back_to_source_ref_without_calendar_date():
 
 def test_grid_without_any_date_source_is_parse_failed():
     html = _real_html().replace('<calendar-date value="2026-09-10"', "<calendar-date")
-    with __import__("pytest").raises(ToolError) as exc:
+    with pytest.raises(ToolError) as exc:
         parser.html_to_rows(html)
     assert exc.value.code == ErrorCode.PARSE_FAILED
+
+
+def test_ingest_fixture_html_uses_explicit_source_ref_when_calendar_date_is_gone():
+    html = _real_html().replace('<calendar-date value="2026-09-10"', "<calendar-date")
+    path = "fixtures/playwright/_kse_no_calendar_date.tmp.html"
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(html)
+    try:
+        result = ingest_timetable_snapshot(
+            {"source": "fixture_html", "path": path, "source_ref": "playwright:live-page:2026-09-10"}
+        )
+        assert result["ok"]
+        assert result["data"]["session_count"] == 4
+    finally:
+        import os
+
+        os.remove(path)
+
+
+def test_all_event_cards_unrecognised_is_parse_failed_not_empty_success():
+    # every "·" corrupted -> no card matches _KSE_CARD_RE at all: this must
+    # read as "the label format changed", not as "no classes this week".
+    html = _real_html().replace("·", "|")
+    with pytest.raises(ToolError) as exc:
+        parser.html_to_rows(html)
+    assert exc.value.code == ErrorCode.PARSE_FAILED
+    assert "unmatched_labels" in exc.value.details
+
+
+def test_one_unrecognised_card_becomes_a_warning_not_a_silent_drop():
+    # corrupt only the first "·" in document order, i.e. only one event card
+    html = _real_html().replace("·", "|", 1)
+    rows = parser.html_to_rows(html)
+    # 3 cards parsed cleanly, 1 turned into a row engineered to fail
+    # validation so it surfaces as a warning instead of vanishing
+    sessions, warnings = parser.rows_to_sessions(rows)
+    assert len(sessions) == 3
+    assert len(warnings) == 1
+    assert "unrecognised schedule.kse.ua event card" in warnings[0]
+
+
+def test_missing_group_suffix_becomes_gr0_not_empty_string():
+    # drop the group suffix from exactly one card
+    html = _real_html().replace(", гр.1", "", 1)
+    rows = parser.html_to_rows(html)
+    groups = {r["group"] for r in rows}
+    assert "GR0" in groups
+    assert "" not in groups
+
+
+def test_stale_calendar_date_relative_to_grid_headers_is_parse_failed():
+    # headers still say "пн 7 / вт 8 / ..." but the anchor now claims a
+    # different week - this must be caught, not silently mis-dated.
+    html = _real_html().replace('value="2026-09-10"', 'value="2026-09-17"')
+    with pytest.raises(ToolError) as exc:
+        parser.html_to_rows(html)
+    assert exc.value.code == ErrorCode.PARSE_FAILED
+    assert exc.value.details["header_day"] == 7
 
 
 def test_ingest_real_kse_grid_end_to_end():

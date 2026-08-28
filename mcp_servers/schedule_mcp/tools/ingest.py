@@ -34,8 +34,8 @@ def ingest_timetable_snapshot(args: dict[str, Any]) -> dict[str, Any]:
 
     elif source == "fixture_html":
         path = _require_path(args)
-        rows = parser.html_to_rows(_read_text(path), selector)
         source_ref = args.get("source_ref") or path
+        rows = parser.html_to_rows(_read_text(path), selector, source_ref=source_ref)
 
     elif source == "local_dataset":
         path = _require_path(args)
