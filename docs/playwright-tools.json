@@ -6,7 +6,7 @@
     "resolved_via": "npx -y @playwright/mcp@latest --version",
     "dumped_at": "2026-08-28",
     "total_tools_discovered": 24,
-    "note": "This file records only the two tools this ticket requires (navigate, snapshot). Fields kept: name, description, inputSchema, outputSchema, annotations - the ones the live server actually populates. Fields dropped: title, icons, _meta, execution - these come back null on every tool in this server's response and are MCP SDK object boilerplate, not server-specific data. The full 24-tool list was confirmed via `python -m agent.run --discover-only`."
+    "note": "This file originally recorded only navigate and snapshot (ticket B1's scope). Ticket B2 added browser_evaluate below, since capture_timetable actually needed it: browser_wait_for (also dumped by B1's --discover-only run) turned out to only support waiting on literal text or a fixed delay, not a CSS selector, so it is not used by capture_timetable and its schema is not recorded here. Fields kept: name, description, inputSchema, outputSchema, annotations - the ones the live server actually populates. Fields dropped: title, icons, _meta, execution - these come back null on every tool in this server's response and are MCP SDK object boilerplate, not server-specific data. The full 24-tool list was confirmed via `python -m agent.run --discover-only`."
   },
   "confirmed_target_B0": {
     "url_pattern": "https://schedule.kse.ua/?date=YYYY-MM-DD&discipline=<COURSE_CODE>",
@@ -82,6 +82,72 @@
       "destructiveHint": false,
       "idempotentHint": null,
       "openWorldHint": true
+    }
+  },
+  "browser_evaluate": {
+    "name": "browser_evaluate",
+    "description": "Evaluate JavaScript expression on page or element",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "element": {
+          "description": "Human-readable element description used to obtain permission to interact with the element",
+          "type": "string"
+        },
+        "target": {
+          "description": "Exact target element reference from the page snapshot, or a unique element selector",
+          "type": "string"
+        },
+        "function": {
+          "type": "string",
+          "description": "() => { /* code */ } or (element) => { /* code */ } when element is provided"
+        },
+        "filename": {
+          "description": "Filename to save the result to. If not provided, result is returned as text.",
+          "type": "string"
+        }
+      },
+      "required": ["function"],
+      "additionalProperties": false
+    },
+    "outputSchema": null,
+    "annotations": {
+      "title": "Evaluate JavaScript",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": null,
+      "openWorldHint": true
+    },
+    "response_shape_note": "No structured content comes back (outputSchema is null, like every tool on this server) - the return value is JSON-encoded and wrapped in free text: '### Result\\n<json>\\n### Ran Playwright code\\n```js\\n...\\n```'. On failure, isError=true and content[0].text starts with '### Error\\n'. Both confirmed against the live server, ticket B2.",
+    "real_transcripts_ticket_B2": {
+      "successful_boolean_check": {
+        "call": {"function": "() => !!document.querySelector('table.schedule')"},
+        "isError": false,
+        "content_text": "### Result\nfalse\n### Ran Playwright code\n```js\nawait page.evaluate('() => !!document.querySelector(\\'table.schedule\\')');\n```"
+      },
+      "successful_html_read_truncated": {
+        "call": {"function": "() => document.documentElement.outerHTML"},
+        "isError": false,
+        "content_text_sample": "### Result\n\"<html lang=\\\"en\\\"><head><title>Example Domain</title>...</html>\"\n### Ran Playwright code\n```js\nawait page.evaluate('() => document.documentElement.outerHTML');\n```"
+      },
+      "failure_context_destroyed": {
+        "note": "observed when evaluate runs right as the page is mid-navigation",
+        "isError": true,
+        "content_text": "### Error\nExecution context was destroyed, most likely because of a navigation\n### Page\n- Page URL: https://example.com/\n- Page Title: Example Domain"
+      }
+    }
+  },
+  "browser_navigate_real_transcripts_ticket_B2": {
+    "unreachable_host": {
+      "call": {"url": "http://this-host-does-not-exist.invalid/"},
+      "isError": true,
+      "content_text": "### Error\nError: browserBackend.callTool: net::ERR_NAME_NOT_RESOLVED at http://this-host-does-not-exist.invalid/\nCall log:\n  - navigating to \"http://this-host-does-not-exist.invalid/\", waiting until \"domcontentloaded\"\n"
+    },
+    "bad_port": {
+      "call": {"url": "http://127.0.0.1:9/"},
+      "isError": true,
+      "content_text": "### Error\nError: browserBackend.callTool: net::ERR_UNSAFE_PORT at http://127.0.0.1:9/\nCall log:\n  - navigating to \"http://127.0.0.1:9/\", waiting until \"domcontentloaded\"\n"
     }
   }
 }
