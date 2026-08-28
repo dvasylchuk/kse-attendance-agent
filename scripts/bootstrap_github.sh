@@ -15,10 +15,21 @@ set -euo pipefail
 OWNER="${OWNER:-dvasylchuk}"
 REPO="${REPO:-kse-attendance-agent}"
 VISIBILITY="${VISIBILITY:-private}"
-COLLABORATORS="${COLLABORATORS:-}"   # e.g. COLLABORATORS="teammate1 teammate2"
+# Optional. Leave empty when you work alone from several machines - the same
+# GitHub account authenticated on each machine already has full access.
+COLLABORATORS="${COLLABORATORS:-}"
 
 command -v gh >/dev/null || { echo "gh CLI is required: https://cli.github.com"; exit 1; }
 command -v jq >/dev/null || { echo "jq is required"; exit 1; }
+
+# The Windows build of jq.exe emits CRLF. Left alone, every value read into a
+# shell variable carries a trailing \r and silently breaks gh arguments.
+jq() { command jq "$@" | tr -d '\r'; }
+
+# git-bash on Windows rewrites arguments that look like absolute paths
+# ("/take" -> "C:/Program Files/Git/take"). Disable that for this script.
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL="*"
 gh auth status >/dev/null || { echo "run: gh auth login"; exit 1; }
 
 SLUG="$OWNER/$REPO"
@@ -43,6 +54,7 @@ git push -u origin main
 
 # ---------------------------------------------------------------------------
 echo "==> collaborators"
+[ -z "$COLLABORATORS" ] && echo "    none requested (solo, multi-machine setup)"
 for user in $COLLABORATORS; do
   gh api -X PUT "repos/$SLUG/collaborators/$user" -f permission=push >/dev/null \
     && echo "    invited $user"
@@ -50,7 +62,7 @@ done
 
 # ---------------------------------------------------------------------------
 echo "==> labels"
-jq -r '.labels[] | [.name,.color,.description] | @tsv' scripts/tickets.json | tr -d '\r' |
+jq -r '.labels[] | [.name,.color,.description] | @tsv' scripts/tickets.json |
 while IFS=$'\t' read -r name color desc; do
   gh label create "$name" --color "$color" --description "$desc" --repo "$SLUG" --force >/dev/null
   echo "    $name"
@@ -58,7 +70,7 @@ done
 
 # ---------------------------------------------------------------------------
 echo "==> milestones"
-jq -r '.milestones[] | [.title,.description] | @tsv' scripts/tickets.json | tr -d '\r' |
+jq -r '.milestones[] | [.title,.description] | @tsv' scripts/tickets.json |
 while IFS=$'\t' read -r title desc; do
   gh api "repos/$SLUG/milestones" -f title="$title" -f description="$desc" >/dev/null 2>&1 \
     && echo "    $title" || echo "    $title (exists)"
@@ -70,9 +82,7 @@ MAP_FILE="$(mktemp)"          # ticket-id -> issue number
 BODY_FILE="$(mktemp)"
 
 # pass 1: create every issue
-# tr strips CR here because on Windows a native jq.exe emits CRLF, which would
-# otherwise get glued onto each id and break the select(.id==$id) match below.
-for id in $(jq -r '.tickets[].id' scripts/tickets.json | tr -d '\r'); do
+for id in $(jq -r '.tickets[].id' scripts/tickets.json); do
   t=$(jq -c --arg id "$id" '.tickets[] | select(.id==$id)' scripts/tickets.json)
   title=$(jq -r '.title' <<<"$t")
   track=$(jq -r '.track' <<<"$t")
@@ -135,12 +145,15 @@ fi
 
 # ---------------------------------------------------------------------------
 echo "==> branch protection on main"
+# NOTE: no required approving review. GitHub does not let you approve your own
+# pull request, so with a single account that setting would deadlock every PR.
+# CI green is the gate instead.
 gh api -X PUT "repos/$SLUG/branches/main/protection" \
-  --input - >/dev/null 2>&1 <<'JSON' && echo "    enabled" || echo "    skipped (private repo on a free plan does not support protection)"
+  --input - >/dev/null 2>&1 <<'JSON' && echo "    enabled (CI required, no review required)" || echo "    skipped (private repo on a free plan does not support protection)"
 {
   "required_status_checks": {"strict": true, "contexts": ["ci"]},
   "enforce_admins": false,
-  "required_pull_request_reviews": {"required_approving_review_count": 1},
+  "required_pull_request_reviews": null,
   "restrictions": null,
   "allow_force_pushes": false,
   "allow_deletions": false

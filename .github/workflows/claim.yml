@@ -10,28 +10,52 @@ jobs:
   take:
     if: github.event.issue.pull_request == null && startsWith(github.event.comment.body, '/take')
     runs-on: ubuntu-latest
+    concurrency:
+      group: take-${{ github.event.issue.number }}
+      cancel-in-progress: false
     steps:
-      - name: Assign the commenter and mark the ticket in progress
+      - name: Claim the ticket for one machine / session
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           NUM: ${{ github.event.issue.number }}
           WHO: ${{ github.event.comment.user.login }}
+          BODY: ${{ github.event.comment.body }}
         run: |
-          if gh issue view "$NUM" --repo "$REPO" --json labels -q '.labels[].name' | grep -qx 'status:blocked'; then
+          # Everything after "/take" identifies the machine or session, e.g.
+          #   /take laptop-a
+          # With a single GitHub account and several Claude Code sessions this
+          # tag is the only thing that says WHERE a ticket is being worked on.
+          AGENT=$(printf '%s' "$BODY" | head -1 | sed 's|^/take[[:space:]]*||' | tr -d '\r' | cut -c1-40)
+          [ -z "$AGENT" ] && AGENT="unnamed-session"
+
+          LABELS=$(gh issue view "$NUM" --repo "$REPO" --json labels -q '.labels[].name')
+
+          if printf '%s\n' "$LABELS" | grep -qx 'status:blocked'; then
             gh issue comment "$NUM" --repo "$REPO" --body \
-              "@$WHO this ticket is still \`status:blocked\`. Close its dependencies first, or say why the block no longer applies."
+              "Still \`status:blocked\`. Close its dependencies first, or explain why the block no longer applies."
             exit 0
           fi
-          ASSIGNEES=$(gh issue view "$NUM" --repo "$REPO" --json assignees -q '.assignees | length')
-          if [ "$ASSIGNEES" != "0" ]; then
-            gh issue comment "$NUM" --repo "$REPO" --body "@$WHO already claimed by someone else - pick another \`status:ready\` ticket."
+
+          if printf '%s\n' "$LABELS" | grep -qx 'status:in-progress'; then
+            HOLDER=$(gh issue view "$NUM" --repo "$REPO" --json comments \
+                     -q '[.comments[] | select(.body | startswith("Claimed by session"))] | last | .body // empty' 2>/dev/null || true)
+            gh issue comment "$NUM" --repo "$REPO" --body \
+              "Already claimed. ${HOLDER:-Another session holds this ticket.} Pick another \`status:ready\` ticket, or release it with \`/drop\`."
             exit 0
           fi
+
           gh issue edit "$NUM" --repo "$REPO" --add-assignee "$WHO" \
             --add-label status:in-progress --remove-label status:ready
+
+          SLUG=$(gh issue view "$NUM" --repo "$REPO" --json title -q '.title' \
+                 | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//' | cut -c1-40)
           gh issue comment "$NUM" --repo "$REPO" --body \
-            "Claimed by @$WHO. Branch: \`git switch -c $(gh issue view "$NUM" --repo "$REPO" --json title -q '.title' | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//' | cut -c1-40)-$NUM\`"
+            "Claimed by session \`$AGENT\` (@$WHO).
+
+          Branch: \`git switch -c $AGENT/$SLUG-$NUM\`
+
+          No other session should start this ticket until it closes or someone comments \`/drop\`."
 
   release:
     if: github.event.issue.pull_request == null && startsWith(github.event.comment.body, '/drop')
@@ -45,4 +69,4 @@ jobs:
         run: |
           gh issue edit "$NUM" --repo "$REPO" --remove-assignee "$WHO" \
             --add-label status:ready --remove-label status:in-progress
-          gh issue comment "$NUM" --repo "$REPO" --body "Released by @$WHO - free to take."
+          gh issue comment "$NUM" --repo "$REPO" --body "Released - free for any session to take."
