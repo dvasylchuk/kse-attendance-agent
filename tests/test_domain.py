@@ -1,5 +1,5 @@
-"""Ticket A6: parser/store unit tests, deterministic fixtures, and the shared
-envelope-shape guarantee every tool must honour."""
+"""Parser/store unit tests, deterministic fixtures, and the shared envelope
+and error-taxonomy guarantees every tool must honour."""
 
 import asyncio
 from datetime import date
@@ -105,9 +105,42 @@ def _assert_envelope(payload: dict) -> None:
 @pytest.mark.parametrize("tool_name", sorted(server.HANDLERS))
 def test_every_tool_returns_the_envelope_shape(tool_name: str):
     # Every handler is exercised with an empty argument dict: each one is
-    # missing a required field, so this reliably hits the FAILURE path
-    # through server.call_tool's own try/except - proving the envelope is
-    # produced by the shared server plumbing, not by each tool individually.
+    # missing a required field, so this reliably hits server.call_tool's own
+    # required-argument check - proving the envelope is produced by the
+    # shared server plumbing, not by each tool individually.
     payload = asyncio.run(server.call_tool(tool_name, {}))
     _assert_envelope(payload)
     assert payload["ok"] is False
+    # A missing required argument is a client mistake, not an unclassified
+    # crash: retrying the identical call can never succeed.
+    assert payload["error"]["code"] == ErrorCode.INVALID_INPUT
+    assert payload["error"]["retryable"] is False
+
+
+def test_unclassified_exception_is_internal_and_retryable(monkeypatch):
+    def _boom(_args):
+        raise RuntimeError("something genuinely unexpected")
+
+    monkeypatch.setitem(server.HANDLERS, "ingest_timetable_snapshot", _boom)
+    payload = asyncio.run(server.call_tool("ingest_timetable_snapshot", {"source": "local_dataset"}))
+    _assert_envelope(payload)
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == ErrorCode.INTERNAL
+    assert payload["error"]["retryable"] is True
+
+
+def test_a_keyerror_bug_inside_a_handler_is_still_internal_not_invalid_input(monkeypatch):
+    # All required arguments are present - this KeyError comes from a bug
+    # deep inside the tool's own logic, not from a missing caller argument,
+    # and must not be misreported as the caller's fault.
+    def _boom(_args):
+        return {}["not_a_real_key"]
+
+    monkeypatch.setitem(server.HANDLERS, "ingest_timetable_snapshot", _boom)
+    payload = asyncio.run(server.call_tool(
+        "ingest_timetable_snapshot", {"source": "local_dataset", "path": "data/schedule.sample.json"},
+    ))
+    _assert_envelope(payload)
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == ErrorCode.INTERNAL
+    assert payload["error"]["retryable"] is True
