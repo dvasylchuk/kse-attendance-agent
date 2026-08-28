@@ -50,7 +50,7 @@ done
 
 # ---------------------------------------------------------------------------
 echo "==> labels"
-jq -r '.labels[] | [.name,.color,.description] | @tsv' scripts/tickets.json |
+jq -r '.labels[] | [.name,.color,.description] | @tsv' scripts/tickets.json | tr -d '\r' |
 while IFS=$'\t' read -r name color desc; do
   gh label create "$name" --color "$color" --description "$desc" --repo "$SLUG" --force >/dev/null
   echo "    $name"
@@ -58,7 +58,7 @@ done
 
 # ---------------------------------------------------------------------------
 echo "==> milestones"
-jq -r '.milestones[] | [.title,.description] | @tsv' scripts/tickets.json |
+jq -r '.milestones[] | [.title,.description] | @tsv' scripts/tickets.json | tr -d '\r' |
 while IFS=$'\t' read -r title desc; do
   gh api "repos/$SLUG/milestones" -f title="$title" -f description="$desc" >/dev/null 2>&1 \
     && echo "    $title" || echo "    $title (exists)"
@@ -70,7 +70,9 @@ MAP_FILE="$(mktemp)"          # ticket-id -> issue number
 BODY_FILE="$(mktemp)"
 
 # pass 1: create every issue
-for id in $(jq -r '.tickets[].id' scripts/tickets.json); do
+# tr strips CR here because on Windows a native jq.exe emits CRLF, which would
+# otherwise get glued onto each id and break the select(.id==$id) match below.
+for id in $(jq -r '.tickets[].id' scripts/tickets.json | tr -d '\r'); do
   t=$(jq -c --arg id "$id" '.tickets[] | select(.id==$id)' scripts/tickets.json)
   title=$(jq -r '.title' <<<"$t")
   track=$(jq -r '.track' <<<"$t")
