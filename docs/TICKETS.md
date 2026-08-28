@@ -22,8 +22,9 @@ Status is not tracked here - GitHub labels are the source of truth:
 
 | Id | Ticket | Depends on | Milestone |
 |---|---|---|---|
+| `B0` | Select and verify the real public schedule page and selector | - | M2 Agent + Playwright |
 | `B1` | Verify Playwright MCP connection and record its real contract | - | M2 Agent + Playwright |
-| `B2` | Implement PlaywrightTools.capture_timetable | B1 | M2 Agent + Playwright |
+| `B2` | Implement PlaywrightTools.capture_timetable | B1, B0 | M2 Agent + Playwright |
 | `B3` | Implement the graph nodes conflicts / optimize / compare / report | A5, B2 | M2 Agent + Playwright |
 | `B4` | Assemble and verify the LangGraph routing | B3 | M2 Agent + Playwright |
 | `B5` | Failure handling and offline replay mode | B2 | M2 Agent + Playwright |
@@ -38,7 +39,8 @@ Status is not tracked here - GitHub labels are the source of truth:
 | `C2` | Part C contracts for all five custom tools | A5 | M3 Documentation |
 | `C3` | Document the Playwright MCP tool contract in project context | B1 | M3 Documentation |
 | `C4` | Design rationale | A5, B4 | M3 Documentation |
-| `C5` | Defence script and demo checklist | B4 | M4 Defence readiness |
+| `C0` | Decide defence format and verify recording pipeline | - | M4 Defence readiness |
+| `C5` | Defence script and demo checklist | B4, C0 | M4 Defence readiness |
 | `C6` | Fixtures and replay instructions | B5 | M3 Documentation |
 | `C7` | Operational and security review | - | M4 Defence readiness |
 | `C8` | Rubric self-check | C2, C4, C5 | M4 Defence readiness |
@@ -48,6 +50,6 @@ Status is not tracked here - GitHub labels are the source of truth:
 | Id | Ticket | Depends on | Milestone |
 |---|---|---|---|
 | `D1` | End-to-end rehearsal, offline | B4, A6 | M4 Defence readiness |
-| `D2` | End-to-end rehearsal, live page | D1 | M4 Defence readiness |
+| `D2` | End-to-end rehearsal, live page | D1, B0 | M4 Defence readiness |
 | `D3` | Failure-scenario rehearsal | B5 | M4 Defence readiness |
 | `D4` | Final repository review before submission | C8, D2, D3 | M4 Defence readiness |
