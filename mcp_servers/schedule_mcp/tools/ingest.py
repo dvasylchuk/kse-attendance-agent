@@ -29,8 +29,8 @@ def ingest_timetable_snapshot(args: dict[str, Any]) -> dict[str, Any]:
                 "source='playwright_html' requires a non-empty raw_html",
                 details={"received_keys": sorted(args)},
             )
-        rows = parser.html_to_rows(raw, selector)
         source_ref = args.get("source_ref") or "playwright:live-page"
+        rows = parser.html_to_rows(raw, selector, source_ref=source_ref)
 
     elif source == "fixture_html":
         path = _require_path(args)

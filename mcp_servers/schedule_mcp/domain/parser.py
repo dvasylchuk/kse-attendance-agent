@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import date, time
+from datetime import date, time, timedelta
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -21,6 +21,17 @@ from .models import Modality, Session, SessionKind
 
 _TIME_RE = re.compile(r"^\s*(\d{1,2})[:.](\d{2})\s*$")
 _RANGE_RE = re.compile(r"(\d{1,2})[:.](\d{2})\s*[-–—]\s*(\d{1,2})[:.](\d{2})")
+
+# schedule.kse.ua (verified live, ticket B0) does not render a <table
+# class="schedule">: each class session is a `.schedule-event-card` inside a
+# `.schedule-grid-cell`, positioned by a fixed (time-slot row, weekday column)
+# grid rather than by any per-event date/time attribute. The card's
+# aria-label is the only structured text: "CODE · Title · Kind, гр.N".
+_KSE_CARD_RE = re.compile(
+    r"^(?P<code>\S+)\s*[·•]\s*(?P<title>.+?)\s*[·•]\s*(?P<kind>[^,]+?)"
+    r"(?:\s*,\s*гр\.\s*(?P<group>\S+))?\s*$"
+)
+_ISO_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 _KIND_ALIASES = {
     "лекція": SessionKind.LECTURE, "лекц": SessionKind.LECTURE, "lecture": SessionKind.LECTURE,
@@ -119,22 +130,35 @@ def rows_to_sessions(rows: list[dict[str, Any]]) -> tuple[list[Session], list[st
     return sessions, warnings
 
 
-def html_to_rows(html: str, table_selector: str = "table.schedule") -> list[dict[str, Any]]:
+def html_to_rows(
+    html: str, table_selector: str = "table.schedule", source_ref: str | None = None
+) -> list[dict[str, Any]]:
     """Extract raw rows from the timetable markup captured by Playwright MCP.
 
-    Expected shape: a <table> whose <thead> carries the column names
-    (date, time, course_code, course_title, group, kind, room, teacher, topic).
-    Column order is read from the header, not hard-coded.
+    Two shapes are supported:
+
+    1. A <table> whose <thead> carries the column names (date, time,
+       course_code, course_title, group, kind, room, teacher, topic). Column
+       order is read from the header, not hard-coded. This is what every
+       recorded fixture under fixtures/playwright/ uses.
+    2. The real schedule.kse.ua grid (verified live, ticket B0): no <table>
+       for session data at all, just `.schedule-event-card` divs positioned
+       in a fixed grid. Used automatically when no table matches.
     """
     soup = BeautifulSoup(html, "lxml")
     table = soup.select_one(table_selector) or soup.find("table")
-    if table is None:
-        raise ToolError(
-            ErrorCode.PARSE_FAILED,
-            f"no timetable table found for selector {table_selector!r}",
-            details={"selector": table_selector, "html_length": len(html)},
-        )
+    if table is not None:
+        return _table_rows(table)
+    if soup.select(".schedule-event-card"):
+        return _kse_grid_rows(soup, source_ref)
+    raise ToolError(
+        ErrorCode.PARSE_FAILED,
+        f"no timetable table found for selector {table_selector!r}",
+        details={"selector": table_selector, "html_length": len(html)},
+    )
 
+
+def _table_rows(table: Any) -> list[dict[str, Any]]:
     header_cells = [th.get_text(strip=True).lower() for th in table.select("thead th")]
     if not header_cells:
         first = table.find("tr")
@@ -149,6 +173,79 @@ def html_to_rows(html: str, table_selector: str = "table.schedule") -> list[dict
         if not cells or len(cells) < 2:
             continue
         rows.append({header_cells[i]: cells[i] for i in range(min(len(cells), len(header_cells)))})
+    return rows
+
+
+def _kse_grid_rows(soup: BeautifulSoup, source_ref: str | None) -> list[dict[str, Any]]:
+    """Parse the real schedule.kse.ua layout.
+
+    No event card carries its own date, so the visible week's Monday has to
+    come from elsewhere on the page. The `<calendar-date value="...">` custom
+    element (the filter card's date picker) carries the exact navigated date
+    and is preferred; if that element is ever removed, we fall back to an
+    ISO date embedded in `source_ref` (the convention capture_timetable, B2,
+    is expected to follow: put the navigated `?date=` there). Column 0 =
+    Monday, confirmed empirically against the live page (ticket B0): 6 day
+    columns (Mon-Sat, no Sunday classes), one row per `Час пари N` time slot,
+    cells in fixed row-major (slot outer, day inner) DOM order.
+
+    Known gap, documented rather than silently guessed at: the card only
+    exposes a *relative* group number ("гр.1"/"гр.2"), not the institutional
+    group code (e.g. BE-3-1) used elsewhere in this domain, and teacher/room
+    are hidden by the site itself unless logged in - both come back as None.
+    """
+    calendar_node = soup.select_one("calendar-date[value]")
+    raw_date = calendar_node["value"] if calendar_node else None
+    m = _ISO_DATE_RE.search(raw_date or "") or _ISO_DATE_RE.search(source_ref or "")
+    if not m:
+        raise ToolError(
+            ErrorCode.PARSE_FAILED,
+            "schedule.kse.ua grid has no per-event date in the markup, and "
+            "neither <calendar-date value=...> nor source_ref carried one",
+            details={"source_ref": source_ref},
+        )
+    anchor = date.fromisoformat(m.group(1))
+    week_start = anchor - timedelta(days=anchor.weekday())
+
+    slot_times: list[tuple[str, str]] = []
+    for node in soup.select('[aria-label^="Час пари"]'):
+        parts = [d.get_text(strip=True) for d in node.find_all("div", recursive=False) if d.get_text(strip=True)]
+        if len(parts) < 2:
+            raise ToolError(ErrorCode.PARSE_FAILED, "a time-slot legend entry has no start/end time")
+        slot_times.append((parts[0], parts[-1]))
+    if not slot_times:
+        raise ToolError(ErrorCode.PARSE_FAILED, "no time-slot legend ('Час пари N') found in the grid")
+
+    cells = soup.select(".schedule-grid-cell")
+    n_slots = len(slot_times)
+    if not cells or len(cells) % n_slots != 0:
+        raise ToolError(
+            ErrorCode.PARSE_FAILED,
+            "grid cell count is not a multiple of the time-slot count; layout likely changed",
+            details={"cells": len(cells), "slots": n_slots},
+        )
+    n_days = len(cells) // n_slots
+
+    rows: list[dict[str, Any]] = []
+    for idx, cell in enumerate(cells):
+        slot_idx, day_idx = divmod(idx, n_days)
+        start_s, end_s = slot_times[slot_idx]
+        session_date = week_start + timedelta(days=day_idx)
+        for card in cell.select(".schedule-event-card"):
+            label = (card.get("aria-label") or "").strip()
+            match = _KSE_CARD_RE.match(label)
+            if not match:
+                continue
+            rows.append(
+                {
+                    "date": session_date.isoformat(),
+                    "time_range": f"{start_s}-{end_s}",
+                    "course_code": match.group("code"),
+                    "course_title": match.group("title"),
+                    "group": f"GR{match.group('group')}" if match.group("group") else "",
+                    "kind": match.group("kind"),
+                }
+            )
     return rows
 
 
