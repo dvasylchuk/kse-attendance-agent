@@ -8,6 +8,21 @@
     "total_tools_discovered": 24,
     "note": "This file records only the two tools this ticket requires (navigate, snapshot). Fields kept: name, description, inputSchema, outputSchema, annotations - the ones the live server actually populates. Fields dropped: title, icons, _meta, execution - these come back null on every tool in this server's response and are MCP SDK object boilerplate, not server-specific data. The full 24-tool list was confirmed via `python -m agent.run --discover-only`."
   },
+  "confirmed_target_B0": {
+    "url_pattern": "https://schedule.kse.ua/?date=YYYY-MM-DD&discipline=<COURSE_CODE>",
+    "confirmed_at": "2026-08-28",
+    "requires_login": false,
+    "notes": [
+      "no default full-timetable view: nothing renders until a discipline is chosen in the search box",
+      "teacher and room are hidden ('Увійдіть, щоб побачити викладачів та аудиторії') unless logged in",
+      "group field is course-relative ('гр.1'/'гр.2'), not the institutional BE-3-1 style code",
+      "session data is NOT in a <table>: div grid, `.schedule-event-card` inside `.schedule-grid-cell`",
+      "the visible week's anchor date is read from <calendar-date value=...>, not from any per-event attribute"
+    ],
+    "real_capture": "fixtures/playwright/kse_schedule_real_2026-09-10.html",
+    "parser": "mcp_servers/schedule_mcp/domain/parser.py (_kse_grid_rows, auto-detected when no <table> matches the configured selector)",
+    "tested_by": "tests/test_kse_grid_parser.py"
+  },
   "browser_navigate": {
     "name": "browser_navigate",
     "description": "Navigate to a URL",

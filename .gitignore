@@ -19,6 +19,7 @@ mcp_servers/schedule_mcp/.state/
 
 # node (playwright mcp)
 node_modules/
+.playwright-mcp/
 
 # os / editors
 .DS_Store

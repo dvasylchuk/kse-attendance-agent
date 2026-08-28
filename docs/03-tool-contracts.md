@@ -56,11 +56,19 @@ reopens a stub).
 | **Name** | `ingest_timetable_snapshot` |
 | **Purpose** | The primary data-source tool and the only entry point for raw timetable material. The model calls it once per capture, before anything else, and passes the returned `snapshot_id` to every other tool. It is also called again on each re-check of the page, because the university edits the timetable during the term. |
 | **Model-facing description** | "Parse a university timetable into a versioned, validated snapshot and return its snapshot_id. This is the entry point of the domain: every other tool takes a snapshot_id produced here. Accepts raw HTML captured from the live schedule page through Playwright MCP, a recorded fixture page, or the prepared local dataset. Normalises times, class kinds and group labels, drops duplicate rows, and reports rejected rows as warnings. Call it again whenever the university may have edited the timetable — identical content yields the same snapshot_id and is not stored twice." |
-| **Input schema** | `source` (string, **required**, enum `playwright_html` \| `fixture_html` \| `local_dataset`); `raw_html` (string, ≤4 MB, required when `source=playwright_html`); `path` (string, required for the other two sources, relative to the repo root); `table_selector` (string, default `table.schedule`); `source_ref` (string, optional, provenance label). `additionalProperties: false`. |
+| **Input schema** | `source` (string, **required**, enum `playwright_html` \| `fixture_html` \| `local_dataset`); `raw_html` (string, ≤4 MB, required when `source=playwright_html`); `path` (string, required for the other two sources, relative to the repo root); `table_selector` (string, default `table.schedule`); `source_ref` (string, optional). `additionalProperties: false`. |
 | **Output schema** | `data.snapshot_id` (string), `captured_at` (date-time), `date_from` / `date_to` (date), `session_count` (int), `groups` (string[]), `courses` (string[]), `rejected_rows` (int), `is_new_snapshot` (bool — `false` when identical content was already stored). |
 | **Error conditions** | `INVALID_INPUT` — `raw_html` empty for `playwright_html`, or `path` missing for a file source. `PARSE_FAILED` — no table matches `table_selector`, table has no header row, or every row failed normalisation (the "page layout changed" case). `DATA_SOURCE_UNAVAILABLE` — the file does not exist; `details` carries the path and the working directory. Individual bad rows are **warnings**, not errors. |
 | **Side effects** | Writes `.state/snapshots/<snapshot_id>.json` and appends one line to `.state/snapshots.index.jsonl` — but only when the content is new. No network access: the markup is handed in by the caller. |
 | **Example** | Input: `{"source": "local_dataset", "path": "data/schedule.sample.json"}` → Output: `{"ok": true, "data": {"snapshot_id": "snap_a1296ab47ac4", "session_count": 14, "groups": ["BE-3-1","BE-3-2","BE-3-3"], "courses": ["ECON301","FIN220","MGMT150","STAT210"], "rejected_rows": 0, "is_new_snapshot": true}, "warnings": []}` |
+
+**`source_ref` is not purely a provenance label (ticket B0).** The real
+schedule.kse.ua page (see `docs/00-execution-plan.md`) is a CSS grid with no
+per-event date; the parser prefers the page's own `<calendar-date value=...>`
+element to resolve the visible week, but falls back to an ISO date found
+inside `source_ref` if that element is absent. For every other supported
+source shape (the `<table class="schedule">` fixtures and the local JSON
+dataset) `source_ref` is still just a label with no parsing effect.
 
 **Why it belongs at the MCP boundary:** it is the trust boundary. Everything
 after it operates on validated domain objects, so no other tool ever has to
