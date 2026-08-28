@@ -84,11 +84,19 @@ It speaks MCP over stdio and logs to stderr. To verify it without the agent:
 python scripts/verify_mcp.py
 ```
 
-**Terminal 2 — the Playwright MCP server** (pinned version):
+**Terminal 2 — the Playwright MCP server**:
 
 ```bash
 npx -y @playwright/mcp@latest --headless --isolated
 ```
+
+Verified against `@playwright/mcp` **0.0.79** (`npx -y @playwright/mcp@latest --version`,
+2026-08-28). `@latest` is what every machine launches, so this number is a
+snapshot of what it resolved to when last verified, not a lockfile pin — if a
+newer release changes tool names or schemas, re-run
+`python -m agent.run --discover-only` and re-check
+[`docs/playwright-tools.json`](docs/playwright-tools.json), which holds the
+`browser_navigate` / `browser_snapshot` contracts dumped from the live server.
 
 **Terminal 3 — the agent:**
 
