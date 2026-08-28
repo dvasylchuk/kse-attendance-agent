@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "source": "live stdio server, dumped via session.list_tools() (see scripts/dump results in PR #9)",
+    "server_command": "npx -y @playwright/mcp@latest --headless --isolated",
+    "resolved_version": "0.0.79",
+    "resolved_via": "npx -y @playwright/mcp@latest --version",
+    "dumped_at": "2026-08-28",
+    "total_tools_discovered": 24,
+    "note": "This file records only the two tools this ticket requires (navigate, snapshot), verbatim from the live server. The full 24-tool list was confirmed via `python -m agent.run --discover-only`."
+  },
+  "browser_navigate": {
+    "name": "browser_navigate",
+    "description": "Navigate to a URL",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The URL to navigate to"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": null
+  },
+  "browser_snapshot": {
+    "name": "browser_snapshot",
+    "description": "Capture accessibility snapshot of the current page, this is better than screenshot",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "target": {
+          "description": "Exact target element reference from the page snapshot, or a unique element selector",
+          "type": "string"
+        },
+        "filename": {
+          "description": "Save snapshot to markdown file instead of returning it in the response.",
+          "type": "string"
+        },
+        "depth": {
+          "description": "Limit the depth of the snapshot tree",
+          "type": "number"
+        },
+        "boxes": {
+          "description": "Include each element's bounding box as [box=x,y,width,height] in the snapshot. Coordinates are viewport-relative, in CSS pixels (Element.getBoundingClientRect)",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputSchema": null
+  }
+}
